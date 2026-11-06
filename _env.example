@@ -1,0 +1,16 @@
+# Copia este archivo a .env y ajusta. NUNCA subas .env a GitHub.
+
+# Base de datos. SQLite para desarrollo local; PostgreSQL en produccion.
+DATABASE_URL=sqlite:///cleanpro.db
+# DATABASE_URL=postgresql://usuario:clave@host:5432/cleanpro
+
+# Docker Compose (valores por defecto solo para desarrollo)
+POSTGRES_USER=cleanpro
+POSTGRES_PASSWORD=cambia-esta-clave
+POSTGRES_DB=cleanpro
+
+# 1 = carga datos de demostracion al arrancar (solo si la base esta vacia)
+CLEANPRO_DEMO=1
+
+# Puerto de la API (Render/Railway/Fly.io lo asignan solos)
+PORT=8000

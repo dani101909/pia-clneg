@@ -1,0 +1,29 @@
+flowchart TB
+  CFG(["ConfiguracionDePoliticas<br/>(soporte: tiempo de cortesía,<br/>catálogo de extras, penalizaciones)"])
+
+  subgraph CTX1["Contexto Cotización"]
+    COT("Cotización<br/>(raíz · Folio)<br/>estados: Vigente / Aceptada / Rechazada")
+  end
+
+  subgraph CTX2["Contexto Operación del servicio"]
+    SRV("Servicio<br/>(raíz · Folio)<br/>Incidencias · Extras · AjusteDePrecioYTiempo<br/>RegistroDeTiempo · SolicitudDeReprogramacion<br/>AsignacionDePersonal")
+    CUA("Cuadrilla<br/>(raíz mínima)")
+    EMP("Empleado<br/>(raíz mínima)")
+  end
+
+  FAC["Facturación<br/>(FUERA de alcance del dominio:<br/>recibe ServicioCerradoParaFacturacion)"]
+
+  CFG -.-> COT
+  CFG -. parámetros .-> SRV
+  COT -. "CotizacionAceptada<br/>(crea Servicio con programación tentativa)" .-> SRV
+  SRV -- CuadrillaId --> CUA
+  SRV -- "EmpleadoId<br/>(original / sustituto)" --> EMP
+  CUA -- miembros --> EMP
+  SRV -. ServicioCerradoParaFacturacion .-> FAC
+
+  classDef raiz fill:#E6F2E9,stroke:#2E7D5B,color:#111
+  classDef soporte fill:#EBE8F8,stroke:#6A5ACD,color:#111
+  classDef externo fill:#FFFFFF,stroke:#999999,stroke-dasharray:5 5,color:#111
+  class COT,SRV,CUA,EMP raiz
+  class CFG soporte
+  class FAC externo

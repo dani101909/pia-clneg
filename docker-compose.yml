@@ -1,0 +1,55 @@
+# Base de datos + aplicacion + pruebas.
+#   docker compose up --build                  -> API en http://localhost:8000/docs
+#   docker compose --profile tests run --rm tests   -> pruebas con cobertura contra PostgreSQL
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cleanpro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cleanpro}
+      POSTGRES_DB: ${POSTGRES_DB:-cleanpro}
+    volumes:
+      - datos_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cleanpro} -d ${POSTGRES_DB:-cleanpro}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cleanpro}:${POSTGRES_PASSWORD:-cleanpro}@db:5432/${POSTGRES_DB:-cleanpro}
+      CLEANPRO_DEMO: ${CLEANPRO_DEMO:-1}
+    ports:
+      - "${PORT:-8000}:8000"
+
+  # Base desechable solo para las pruebas (sin volumen: nace limpia cada vez).
+  db_test:
+    image: postgres:16
+    profiles: ["tests"]
+    environment:
+      POSTGRES_USER: cleanpro
+      POSTGRES_PASSWORD: cleanpro
+      POSTGRES_DB: cleanpro_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cleanpro -d cleanpro_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tests:
+    build: .
+    profiles: ["tests"]
+    depends_on:
+      db_test:
+        condition: service_healthy
+    environment:
+      TEST_DATABASE_URL: postgresql://cleanpro:cleanpro@db_test:5432/cleanpro_test
+    command: python -m pytest tests --cov=src --cov-report=term-missing --cov-fail-under=80
+
+volumes:
+  datos_pg:

@@ -1,0 +1,10 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+*.db
+.env
+.coverage
+coverage.xml
+docs

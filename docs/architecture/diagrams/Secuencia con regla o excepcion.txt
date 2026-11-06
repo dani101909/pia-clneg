@@ -1,0 +1,59 @@
+@startuml
+title Diagrama de Secuencia: Flujo con Regla/Excepción - Cerrar para Facturación (CU-05)
+
+actor "Administración" as Admin
+participant "CierreAppService" as AppService
+participant "ServicioRepository" as ServRepo
+participant "Servicio" as Servicio
+participant "UnitOfWork" as UoW
+participant "FacturacionPort" as FactPort
+
+Admin -> AppService: cerrarParaFacturacion(folio, adminId)
+activate AppService
+
+AppService -> ServRepo: obtenerPorFolio(folio)
+activate ServRepo
+ServRepo --> AppService: servicio
+deactivate ServRepo
+
+AppService -> Servicio: cerrarParaFacturacion(adminId)
+activate Servicio
+
+note right: Regla BR-07 / Invariante S12:\nValida que no haya incidencias\no extras pendientes.
+
+alt [Existen pendientes por documentar]
+    Servicio --> AppService: throw CIERRE_BLOQUEADO(detalle_pendientes)
+    
+    AppService -> UoW: rollback()
+    activate UoW
+    UoW --> AppService: ok
+    deactivate UoW
+    
+    AppService --> Admin: Error: CIERRE_BLOQUEADO\n(Indica qué falta)
+    
+else [No hay pendientes]
+    Servicio --> AppService: void (estado: CerradoParaFacturacion)
+    
+    AppService -> ServRepo: guardar(servicio)
+    activate ServRepo
+    ServRepo --> AppService: ok
+    deactivate ServRepo
+
+    AppService -> UoW: commit()
+    activate UoW
+    UoW --> AppService: ok
+    deactivate UoW
+
+    AppService -> FactPort: publicar(ServicioCerradoParaFacturacion)
+    activate FactPort
+    note right: El dominio no depende\ndel sistema contable (ADR-004)
+    FactPort --> AppService: ok
+    deactivate FactPort
+
+    AppService --> Admin: Servicio cerrado correctamente
+end
+
+deactivate Servicio
+deactivate AppService
+
+@enduml

@@ -1,0 +1,50 @@
+@startuml
+title Diagrama de Secuencia: Flujo Principal - Confirmar Cuadrilla (CU-02)
+
+actor "Coordinador" as Coord
+participant "ProgramacionAppService" as AppService
+participant "ServicioRepository" as ServRepo
+participant "CuadrillaRepository" as CuadRepo
+participant "AsignadorDeCuadrilla" as Asignador
+participant "Servicio" as Servicio
+participant "UnitOfWork" as UoW
+
+Coord -> AppService: confirmarCuadrilla(folio, cuadrillaId, coordinadorId)
+activate AppService
+
+AppService -> ServRepo: obtenerPorFolio(folio)
+activate ServRepo
+ServRepo --> AppService: servicio
+deactivate ServRepo
+
+AppService -> CuadRepo: obtenerPorId(cuadrillaId)
+activate CuadRepo
+CuadRepo --> AppService: cuadrilla
+deactivate CuadRepo
+
+AppService -> Asignador: verificarDisponibilidad(cuadrilla, fecha)
+activate Asignador
+note right: Cruza Servicio y Cuadrilla\npara verificar disponibilidad real
+Asignador --> AppService: disponible = true
+deactivate Asignador
+
+AppService -> Servicio: confirmarCuadrilla(cuadrilla, coordinador)
+activate Servicio
+note right: Valida BR-02:\nCambia estado a CuadrillaConfirmada
+Servicio --> AppService: void
+deactivate Servicio
+
+AppService -> ServRepo: guardar(servicio)
+activate ServRepo
+ServRepo --> AppService: ok
+deactivate ServRepo
+
+AppService -> UoW: commit()
+activate UoW
+UoW --> AppService: ok
+deactivate UoW
+
+AppService --> Coord: Confirmación exitosa
+deactivate AppService
+
+@enduml

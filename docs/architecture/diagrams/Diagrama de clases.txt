@@ -1,0 +1,29 @@
+left to right direction
+
+package "Capa Aplicación" {
+    class Aplicacion <<Capa Aplicación>> {
+        +confirmarCuadrilla()
+        +cerrarParaFacturacion()
+    }
+}
+
+package "Capa Dominio" {
+    class Servicio <<Aggregate Root>> {
+        +confirmarCuadrilla()
+        +cerrarParaFacturacion()
+    }
+    class Cotizacion <<Aggregate Root>>
+    interface IRepositorio <<Interfaz>>
+    interface IUnidadDeTrabajo <<Interfaz>>
+}
+
+package "Capa Infraestructura" {
+    class RepositorioSQL <<Infraestructura>>
+    class UnidadDeTrabajoSQL <<Infraestructura>>
+}
+
+Aplicacion ..> IRepositorio
+Aplicacion ..> IUnidadDeTrabajo
+Servicio --> Cotizacion : Vinculados por Folio
+RepositorioSQL ..|> IRepositorio
+UnidadDeTrabajoSQL ..|> IUnidadDeTrabajo
