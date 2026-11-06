@@ -117,5 +117,24 @@ class InicioTerminoIncidenciaTest(AppSqlConDemo):
         self.assertEqual(r.codigo, "DATOS_INCOMPLETOS")
 
 
+class PanelOperativoTest(AppSqlConDemo):
+    def test_resume_cotizaciones_servicios_y_pendientes(self):
+        from src.infrastructure.sql_lectura import PanelReadRepositorySql
+        panel = PanelReadRepositorySql(self.conexion)
+        inicial = panel.resumen()
+        self.assertEqual(len(inicial["cotizaciones"]), 3)
+        self.assertEqual(inicial["servicios"], [])
+        self.assertEqual([c["id"] for c in inicial["cuadrillas"]], ["cuad-1", "cuad-2"])
+        self.assertEqual(inicial["cuadrillas"][0]["integrantes"], ["emp-1", "emp-2"])
+        self.assertFalse(next(e for e in inicial["empleados"] if e["id"] == "emp-6")
+                         ["disponible_para_cubrir"])
+        self.enEjecucion()
+        self.app.ejecucion.documentarIncidencia(DocumentarIncidencia(
+            FOLIO, TipoDeIncidencia.DANIO_REPORTADO, "Vidrio roto", "sup-1"))
+        servicio = panel.resumen()["servicios"][0]
+        self.assertEqual((servicio["folio"], servicio["estado"], servicio["pendientes"]),
+                         ("COT-0001", "EnEjecucion", 1))
+
+
 if __name__ == "__main__":
     unittest.main()

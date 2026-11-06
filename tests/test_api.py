@@ -67,6 +67,18 @@ class ApiTest(unittest.TestCase):
         self.assertTrue(folio.startswith("COT-"))
         self.assertEqual(self.cliente.get(f"/cotizaciones/{folio}").status_code, 200)
 
+    def test_panel_y_pagina_principal(self):
+        panel = self.cliente.get("/panel").json()
+        self.assertEqual(len(panel["cotizaciones"]), 3)
+        self.assertEqual(panel["servicios"], [])
+        self.aceptar_y_confirmar()
+        servicios = self.cliente.get("/panel").json()["servicios"]
+        self.assertEqual((servicios[0]["folio"], servicios[0]["estado"]),
+                         ("COT-0001", "CuadrillaConfirmada"))
+        pagina = self.cliente.get("/")
+        self.assertEqual(pagina.status_code, 200)
+        self.assertIn("CleanPro", pagina.text)
+
     def test_404_cuando_no_existe(self):
         r = self.cliente.get("/servicios/NO-EXISTE")
         self.assertEqual(r.status_code, 404)

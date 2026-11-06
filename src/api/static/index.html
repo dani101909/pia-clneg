@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CleanPro · Operación</title>
+<style>
+  :root {
+    --bg:#f4f6f8; --card:#fff; --ink:#1b2733; --muted:#66788a; --line:#dde3e9;
+    --brand:#0a7d6c; --brand-ink:#fff; --warn-bg:#fff4dc; --warn:#8a5a00;
+    --err-bg:#fde8e8; --err:#9b1c1c; --ok-bg:#e1f5ee; --ok:#0b6b50;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#10161c; --card:#18212a; --ink:#e7edf2; --muted:#90a2b3; --line:#2a3744;
+            --brand:#2bb59f; --brand-ink:#04211c; --warn-bg:#3a2e12; --warn:#f2c46b;
+            --err-bg:#3d1c1c; --err:#f3a0a0; --ok-bg:#12352c; --ok:#7fddc3; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center;
+           padding:12px 20px; background:var(--card); border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:19px; letter-spacing:.2px; }
+  header h1 span { color:var(--brand); }
+  .grow { flex:1; }
+  label.inline { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+  select, input, textarea, button { font:inherit; color:inherit; }
+  select, input, textarea { background:var(--card); border:1px solid var(--line);
+           border-radius:8px; padding:7px 10px; max-width:100%; }
+  button { border:1px solid var(--line); background:var(--card); border-radius:8px;
+           padding:7px 14px; cursor:pointer; }
+  button.primary { background:var(--brand); color:var(--brand-ink); border-color:var(--brand); font-weight:600; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  a.doc { color:var(--muted); font-size:13px; }
+  .strip { display:flex; flex-wrap:wrap; gap:8px; padding:12px 20px 0; }
+  .chip { background:var(--card); border:1px solid var(--line); border-radius:999px;
+          padding:4px 12px; font-size:13px; }
+  .chip b { margin-left:6px; }
+  main { display:grid; grid-template-columns:minmax(260px,340px) 1fr; gap:16px; padding:16px 20px 40px; }
+  @media (max-width:820px) { main { grid-template-columns:1fr; } }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .panel h2 { margin:0 0 10px; font-size:15px; }
+  .tabs { display:flex; gap:6px; margin-bottom:10px; }
+  .tabs button { flex:1; }
+  .tabs button.on { background:var(--brand); color:var(--brand-ink); border-color:var(--brand); }
+  .item { padding:9px 10px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; cursor:pointer; }
+  .item:hover { border-color:var(--brand); }
+  .item.sel { border-color:var(--brand); box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 25%,transparent); }
+  .item .t { display:flex; justify-content:space-between; gap:8px; font-weight:600; }
+  .item .s { color:var(--muted); font-size:13px; }
+  .badge { font-size:12px; padding:2px 9px; border-radius:999px; background:var(--ok-bg); color:var(--ok); white-space:nowrap; font-weight:600; }
+  .badge.EnRiesgo,.badge.NoRealizado,.badge.Cancelado,.badge.Rechazada { background:var(--err-bg); color:var(--err); }
+  .badge.Programado,.badge.Vigente,.badge.Terminado { background:var(--warn-bg); color:var(--warn); }
+  .pend { color:var(--warn); font-size:12px; }
+  dl { display:grid; grid-template-columns:max-content 1fr; gap:4px 16px; margin:8px 0 12px; }
+  dt { color:var(--muted); } dd { margin:0; }
+  .box { border:1px solid var(--line); border-radius:10px; padding:12px; margin-top:12px; }
+  .box h3 { margin:0 0 8px; font-size:14px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px; }
+  .callout { border-radius:10px; padding:10px 12px; margin-top:12px; background:var(--warn-bg); color:var(--warn); }
+  .callout ul { margin:6px 0 0 18px; padding:0; }
+  .muted { color:var(--muted); font-size:13px; }
+  .tl { list-style:none; margin:0; padding:0; }
+  .tl li { border-left:3px solid var(--line); padding:2px 0 8px 12px; }
+  .tl small { color:var(--muted); display:block; }
+  #aviso { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); max-width:min(640px,92vw);
+           padding:12px 16px; border-radius:12px; box-shadow:0 8px 28px rgba(0,0,0,.25); z-index:10; display:none; }
+  #aviso.ok { background:var(--ok-bg); color:var(--ok); }
+  #aviso.err { background:var(--err-bg); color:var(--err); }
+  #aviso ul { margin:6px 0 0 18px; padding:0; }
+  .vacio { color:var(--muted); padding:30px 10px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Clean<span>Pro</span> · Operación</h1>
+  <label class="inline">Rol activo
+    <select id="rol"></select>
+  </label>
+  <span class="muted" id="quien"></span>
+  <span class="grow"></span>
+  <button id="recargar" title="Volver a consultar">Actualizar</button>
+  <a class="doc" href="/docs" target="_blank" rel="noopener">API (Swagger)</a>
+</header>
+
+<div class="strip" id="resumen" aria-label="Servicios por estado"></div>
+
+<main>
+  <section class="panel">
+    <div class="tabs">
+      <button id="tab-servicios" class="on">Servicios</button>
+      <button id="tab-cotizaciones">Cotizaciones</button>
+    </div>
+    <div id="nueva"></div>
+    <div id="lista"></div>
+  </section>
+  <section class="panel" id="detalle"><div class="vacio">Elige un servicio o una cotización de la lista.</div></section>
+</main>
+<div id="aviso" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const ROLES = {
+  "Cliente": null,                     // actua con el id del cliente de la cotizacion
+  "Coordinador": "coord-1",
+  "Supervisor": "sup-1",
+  "Administración": "admin-1"
+};
+const MENSAJES = {
+  SIN_PERMISO: "Tu rol no puede realizar esta acción.",
+  COTIZACION_NO_VIGENTE: "La cotización ya no está vigente.",
+  TRANSICION_INVALIDA: "Esa acción no es posible en el estado actual del servicio.",
+  CUADRILLA_NO_DISPONIBLE: "Esa cuadrilla ya está ocupada en la fecha del servicio.",
+  SUSTITUTO_NO_DISPONIBLE: "Ese empleado no está disponible para cubrir la ausencia.",
+  TERMINO_INVALIDO: "La hora de término no es válida.",
+  CIERRE_BLOQUEADO: "No se puede cerrar para facturación: hay pendientes por documentar.",
+  DATOS_INCOMPLETOS: "Faltan datos obligatorios o alguno no es válido.",
+  VALOR_INVALIDO: "Alguno de los valores no es válido.",
+  FOLIO_DUPLICADO: "Ya existe una cotización con ese folio.",
+  NO_ENCONTRADO: "No se encontró el registro.",
+  SERVICIO_SIN_FECHA: "El servicio todavía no tiene fecha programada.",
+  VALIDACION: "Revisa los campos del formulario."
+};
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g,
+  (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (iso) => iso ? new Date(iso).toLocaleString("es-MX",
+  {dateStyle:"medium", timeStyle:"short"}) : "—";
+
+let estado = { rol: "Coordinador", panel: null, pestana: "servicios", sel: null, detalle: null, disp: null };
+
+/* ---------- API ---------- */
+async function api(ruta, metodo = "GET", cuerpo) {
+  const r = await fetch(ruta, {
+    method: metodo,
+    headers: cuerpo ? {"Content-Type": "application/json"} : undefined,
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined
+  });
+  let datos = null;
+  try { datos = await r.json(); } catch (_) {}
+  if (!r.ok) {
+    const e = (datos && datos.codigo) ? datos : {codigo: "VALIDACION", detalle: ""};
+    throw Object.assign(new Error(e.codigo), {codigo: e.codigo, detalle: e.detalle, http: r.status});
+  }
+  return datos;
+}
+
+let temporizador;
+function aviso(tipo, html) {
+  const a = $("aviso");
+  a.className = tipo; a.innerHTML = html; a.style.display = "block";
+  clearTimeout(temporizador);
+  temporizador = setTimeout(() => { a.style.display = "none"; }, tipo === "ok" ? 4500 : 9000);
+}
+function avisoError(e) {
+  const base = MENSAJES[e.codigo] || "No se pudo completar la acción.";
+  const det = Array.isArray(e.detalle) && e.detalle.length
+    ? "<ul>" + e.detalle.map((d) => `<li>${esc(d)}</li>`).join("") + "</ul>"
+    : (typeof e.detalle === "string" && e.detalle ? `<div class="muted" style="color:inherit">${esc(e.detalle)}</div>` : "");
+  aviso("err", `<b>${esc(base)}</b>${det}`);
+}
+
+async function ejecutar(ruta, cuerpo, mensaje) {
+  try {
+    const r = await api(ruta, "POST", cuerpo);
+    const ev = (r.eventos || []).length ? ` <span class="muted" style="color:inherit">(${r.eventos.map(esc).join(", ")})</span>` : "";
+    aviso("ok", `<b>${esc(mensaje)}</b>${ev}`);
+    await cargarPanel();
+    return r;
+  } catch (e) { avisoError(e); await cargarPanel(); return null; }
+}
+
+/* ---------- actor segun el rol ---------- */
+function actor() {
+  if (estado.rol === "Cliente") return (estado.detalle && estado.detalle.cliente_id) || (estado.sel && estado.sel.cliente_id) || "cli-1";
+  return ROLES[estado.rol];
+}
+
+/* ---------- carga ---------- */
+async function cargarPanel() {
+  estado.panel = await api("/panel");
+  pintarResumen(); pintarLista();
+  if (estado.sel) await abrir(estado.sel.tipo, estado.sel.folio, false);
+}
+
+function pintarResumen() {
+  const cuenta = {};
+  estado.panel.servicios.forEach((s) => { cuenta[s.estado] = (cuenta[s.estado] || 0) + 1; });
+  const vigentes = estado.panel.cotizaciones.filter((c) => c.estado === "Vigente").length;
+  const partes = [`<span class="chip">Cotizaciones vigentes<b>${vigentes}</b></span>`];
+  Object.entries(cuenta).forEach(([e, n]) => partes.push(`<span class="chip">${esc(e)}<b>${n}</b></span>`));
+  $("resumen").innerHTML = partes.join("");
+}
+
+function pintarLista() {
+  const sel = estado.sel;
+  const p = estado.panel;
+  let html = "";
+  if (estado.pestana === "servicios") {
+    if (!p.servicios.length) html = `<div class="vacio">Aún no hay servicios. Acepta una cotización para crear el primero.</div>`;
+    html = p.servicios.map((s) => `
+      <div class="item ${sel && sel.tipo === "servicio" && sel.folio === s.folio ? "sel" : ""}" data-t="servicio" data-f="${esc(s.folio)}">
+        <div class="t"><span>${esc(s.folio)}</span><span class="badge ${esc(s.estado)}">${esc(s.estado)}</span></div>
+        <div class="s">${esc(s.ubicacion)} · ${fmt(s.fecha)}</div>
+        <div class="s">Cuadrilla: ${esc(s.cuadrilla_id || "sin confirmar")}
+          ${s.pendientes ? `<span class="pend"> · ${s.pendientes} pendiente(s)</span>` : ""}</div>
+      </div>`).join("") || html;
+  } else {
+    html = p.cotizaciones.map((c) => `
+      <div class="item ${sel && sel.tipo === "cotizacion" && sel.folio === c.folio ? "sel" : ""}" data-t="cotizacion" data-f="${esc(c.folio)}">
+        <div class="t"><span>${esc(c.folio)}</span><span class="badge ${esc(c.estado)}">${esc(c.estado)}</span></div>
+        <div class="s">${esc(c.tipo_de_inmueble)} · ${esc(c.ubicacion)}</div>
+        <div class="s">Cliente ${esc(c.cliente_id)} · $${esc(c.precio)}</div>
+      </div>`).join("") || `<div class="vacio">No hay cotizaciones.</div>`;
+  }
+  $("lista").innerHTML = html;
+  $("lista").querySelectorAll(".item").forEach((el) =>
+    el.addEventListener("click", () => abrir(el.dataset.t, el.dataset.f, true)));
+}
+
+function pintarNueva() {
+  const cont = $("nueva");
+  if (estado.rol !== "Coordinador" || estado.pestana !== "cotizaciones") { cont.innerHTML = ""; return; }
+  cont.innerHTML = `<button class="primary" id="btn-nueva" style="width:100%;margin-bottom:10px">+ Nueva cotización</button>`;
+  $("btn-nueva").onclick = formularioCotizacion;
+}
+
+async function abrir(tipo, folio, desplazar) {
+  const meta = (tipo === "servicio" ? estado.panel.servicios : estado.panel.cotizaciones).find((x) => x.folio === folio);
+  let detalle, disp = null;
+  try {
+    detalle = tipo === "servicio" ? await api(`/servicios/${encodeURIComponent(folio)}`)
+                                  : await api(`/cotizaciones/${encodeURIComponent(folio)}`);
+    detalle.cliente_id = detalle.cliente_id || (meta && meta.cliente_id);
+    if (tipo === "servicio" && detalle.fecha) disp = await api(`/disponibilidad?fecha=${detalle.fecha.slice(0, 10)}`);
+  } catch (e) { avisoError(e); return; }
+  // La seleccion y el detalle se asignan juntos: nunca quedan de tipos distintos.
+  estado.sel = {tipo, folio, cliente_id: meta && meta.cliente_id};
+  estado.detalle = detalle; estado.disp = disp;
+  pintarLista(); pintarDetalle();
+  if (desplazar && window.innerWidth < 820) $("detalle").scrollIntoView({behavior: "smooth"});
+}
+
+/* ---------- detalle ---------- */
+function pintarDetalle() {
+  const d = estado.detalle;
+  if (!d) return;
+  $("detalle").innerHTML = estado.sel.tipo === "servicio" ? htmlServicio(d) : htmlCotizacion(d);
+  enlazar();
+}
+
+function htmlCotizacion(c) {
+  const puede = estado.rol === "Cliente" && c.estado === "Vigente";
+  return `
+    <h2>Cotización ${esc(c.folio)} <span class="badge ${esc(c.estado)}">${esc(c.estado)}</span></h2>
+    <dl>
+      <dt>Cliente</dt><dd>${esc(c.cliente_id)}</dd>
+      <dt>Inmueble</dt><dd>${esc(c.tipo_de_inmueble)} · ${esc(c.superficie)} m² · ${esc(c.ubicacion)}</dd>
+      <dt>Frecuencia</dt><dd>${esc(c.frecuencia)}</dd>
+      <dt>Extras cotizados</dt><dd>${c.extras.length ? c.extras.map(esc).join(", ") : "Ninguno"}</dd>
+      <dt>Estimación</dt><dd>${esc(c.estimacion.duracion_horas)} h · ${esc(c.estimacion.personal)} personas · $${esc(c.estimacion.precio)}</dd>
+    </dl>
+    ${c.estado === "Vigente" ? `
+    <div class="box"><h3>Aceptar cotización</h3>
+      ${puede ? `<div class="row">
+        <label class="inline">Fecha y hora del servicio <input type="datetime-local" id="f-fecha"></label>
+        <button class="primary" id="a-aceptar">Aceptar y programar</button></div>`
+      : `<div class="muted">Solo el cliente (${esc(c.cliente_id)}) acepta su cotización. Cambia el rol a «Cliente».</div>`}
+    </div>` : `<div class="muted" style="margin-top:12px">Esta cotización ya no admite cambios.</div>`}`;
+}
+
+function htmlServicio(s) {
+  const rol = estado.rol;
+  const pend = s.pendientes_por_documentar || [];
+  const cuadrillas = estado.panel.cuadrillas;
+  const libre = (id) => { const f = (estado.disp || []).find((x) => x.cuadrilla_id === id); return f ? f.libre : true; };
+  const ausentes = s.incidencias.filter((i) => i.tipo === "Ausencia" && i.empleado_id).map((i) => i.empleado_id);
+  const emp = estado.panel.empleados;
+
+  let acciones = "";
+  if (rol === "Coordinador") {
+    acciones += `<div class="box"><h3>Confirmar cuadrilla</h3><div class="row">
+      <select id="f-cuadrilla">${cuadrillas.map((c) =>
+        `<option value="${esc(c.id)}">${esc(c.id)} — ${libre(c.id) ? "libre" : "ocupada"} (${c.integrantes.map(esc).join(", ")})</option>`).join("")}</select>
+      <button class="primary" id="a-cuadrilla">Confirmar</button></div>
+      ${s.fecha ? "" : `<div class="muted">El servicio aún no tiene fecha.</div>`}</div>`;
+    const pendientes = s.extras.filter((e) => e.estado === "Pendiente de confirmacion");
+    if (pendientes.length) acciones += `<div class="box"><h3>Extras por confirmar</h3>${pendientes.map((e) =>
+      `<div class="row"><span>${esc(e.id)} · ${esc(e.descripcion)}</span><button data-confirmar-extra="${esc(e.id)}">Confirmar extra</button></div>`).join("")}</div>`;
+  }
+  if (rol === "Supervisor") {
+    acciones += `<div class="box"><h3>Ejecución</h3><div class="row">
+      <button class="primary" id="a-inicio">Registrar inicio</button>
+      <button class="primary" id="a-termino">Registrar término</button></div></div>
+    <div class="box"><h3>Ausencia de personal</h3><div class="row">
+      <select id="f-ausente">${emp.map((e) => `<option value="${esc(e.id)}">${esc(e.id)} · ${esc(e.nombre)}</option>`).join("")}</select>
+      <button id="a-ausencia">Reportar ausencia</button></div></div>
+    <div class="box"><h3>Extra en sitio</h3><div class="row">
+      <input id="f-extra" placeholder="Descripción del extra" size="28">
+      <button id="a-extra">Registrar extra</button></div>
+      <div class="muted">Si está en el catálogo se acepta; si no, queda pendiente de confirmación del coordinador.</div></div>
+    <div class="box"><h3>Incidencia</h3><div class="row">
+      <select id="f-tipo"><option value="DanioReportado">Daño reportado</option><option value="MaterialEspecial">Material especial</option>
+        <option value="AccesoNegado">Acceso negado</option><option value="Ausencia">Ausencia</option></select>
+      <input id="f-inc" placeholder="Descripción" size="28">
+      <button id="a-incidencia">Documentar</button></div></div>`;
+  }
+  if (rol === "Administración") {
+    const pendInc = s.incidencias.filter((i) => i.estado !== "Revisada");
+    if (pendInc.length) acciones += `<div class="box"><h3>Incidencias por revisar</h3>${pendInc.map((i) =>
+      `<div class="row"><span>${esc(i.id)} · ${esc(i.tipo)} — ${esc(i.descripcion)}</span><button data-revisar="${esc(i.id)}">Marcar revisada</button></div>`).join("")}</div>`;
+    acciones += `<div class="box"><h3>Reasignar personal</h3><div class="row">
+      <select id="f-orig">${(ausentes.length ? ausentes : emp.map((e) => e.id)).map((i) => `<option>${esc(i)}</option>`).join("")}</select>
+      <span class="muted">→</span>
+      <select id="f-sust"><option value="">Sin reemplazo (servicio en riesgo)</option>${emp.map((e) =>
+        `<option value="${esc(e.id)}">${esc(e.id)} · ${esc(e.nombre)}${e.disponible_para_cubrir ? "" : " (no disponible)"}</option>`).join("")}</select>
+      <button id="a-reasignar">Aplicar</button></div></div>
+    <div class="box"><h3>Facturación</h3><div class="row">
+      <button class="primary" id="a-cierre">Cerrar para facturación</button></div></div>`;
+  }
+  if (rol === "Cliente") acciones = `<div class="muted" style="margin-top:12px">El cliente consulta el estado e historial de su servicio. Para operar, cambia de rol.</div>`;
+
+  return `
+    <h2>Servicio ${esc(s.folio)} <span class="badge ${esc(s.estado)}">${esc(s.estado)}</span></h2>
+    <dl>
+      <dt>Fecha</dt><dd>${fmt(s.fecha)}</dd>
+      <dt>Cuadrilla</dt><dd>${esc(s.cuadrilla_id || "Sin confirmar")}</dd>
+      <dt>Inicio / término</dt><dd>${fmt(s.inicio)} → ${fmt(s.termino)}</dd>
+      <dt>Acciones del estado</dt><dd>${s.acciones_disponibles.length ? s.acciones_disponibles.map(esc).join(" · ") : "Estado final"}</dd>
+    </dl>
+    ${pend.length ? `<div class="callout"><b>Por qué no se puede cerrar todavía:</b><ul>${pend.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></div>` : ""}
+    ${acciones}
+    <div class="box"><h3>Incidencias</h3>${s.incidencias.length ? s.incidencias.map((i) =>
+      `<div>${esc(i.id)} · ${esc(i.tipo)} — ${esc(i.descripcion)} <span class="badge ${i.estado === "Revisada" ? "" : "Programado"}">${esc(i.estado)}</span></div>`).join("") : `<span class="muted">Sin incidencias.</span>`}</div>
+    <div class="box"><h3>Extras</h3>${s.extras.length ? s.extras.map((e) =>
+      `<div>${esc(e.id)} · ${esc(e.descripcion)} <span class="badge ${e.estado === "Pendiente de confirmacion" ? "Programado" : ""}">${esc(e.estado)}</span></div>`).join("") : `<span class="muted">Sin extras.</span>`}</div>
+    ${s.asignaciones.length ? `<div class="box"><h3>Reasignaciones</h3>${s.asignaciones.map((a) =>
+      `<div>${esc(a.empleado_original)} → ${esc(a.sustituto || "sin reemplazo")} · ${esc(a.realizada_por)} · ${fmt(a.cuando)}</div>`).join("")}</div>` : ""}
+    <div class="box"><h3>Historial</h3>${s.historial.length ? `<ul class="tl">${s.historial.map((h) =>
+      `<li>${esc(h.que)}${h.motivo ? " · " + esc(h.motivo) : ""}<small>${esc(h.quien)} · ${fmt(h.cuando)}</small></li>`).join("")}</ul>` : `<span class="muted">Sin cambios registrados.</span>`}</div>`;
+}
+
+/* ---------- acciones ---------- */
+function enlazar() {
+  const folio = estado.sel.folio, base = `/servicios/${encodeURIComponent(folio)}`;
+  const clic = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+  clic("a-aceptar", () => {
+    const f = $("f-fecha").value;
+    ejecutar(`/cotizaciones/${encodeURIComponent(folio)}/aceptacion`,
+      {cliente_id: actor(), fecha: f ? f + ":00" : null}, "Cotización aceptada; servicio programado");
+  });
+  clic("a-cuadrilla", () => ejecutar(`${base}/cuadrilla`,
+    {cuadrilla_id: $("f-cuadrilla").value, coordinador_id: actor()}, "Cuadrilla confirmada"));
+  clic("a-inicio", () => ejecutar(`${base}/inicio`, {supervisor_id: actor()}, "Inicio registrado"));
+  clic("a-termino", () => ejecutar(`${base}/termino`, {supervisor_id: actor()}, "Término registrado"));
+  clic("a-ausencia", () => ejecutar(`${base}/ausencias`,
+    {empleado_id: $("f-ausente").value, supervisor_id: actor()}, "Ausencia reportada; se avisó a Administración"));
+  clic("a-extra", () => ejecutar(`${base}/extras`,
+    {descripcion: $("f-extra").value, supervisor_id: actor()}, "Extra registrado"));
+  clic("a-incidencia", () => ejecutar(`${base}/incidencias`,
+    {tipo: $("f-tipo").value, descripcion: $("f-inc").value, supervisor_id: actor()}, "Incidencia documentada"));
+  clic("a-reasignar", () => ejecutar(`${base}/reasignaciones`,
+    {empleado_id: $("f-orig").value, sustituto_id: $("f-sust").value || null, admin_id: actor()},
+    $("f-sust").value ? "Personal reasignado" : "Servicio declarado en riesgo"));
+  clic("a-cierre", () => ejecutar(`${base}/cierre`, {admin_id: actor()}, "Servicio cerrado para facturación"));
+  document.querySelectorAll("[data-revisar]").forEach((b) => b.onclick = () =>
+    ejecutar(`${base}/incidencias/${encodeURIComponent(b.dataset.revisar)}/revision`, {admin_id: actor()}, "Incidencia revisada"));
+  document.querySelectorAll("[data-confirmar-extra]").forEach((b) => b.onclick = () =>
+    ejecutar(`${base}/extras/${encodeURIComponent(b.dataset.confirmarExtra)}/confirmacion`, {coordinador_id: actor()}, "Extra confirmado"));
+}
+
+function formularioCotizacion() {
+  estado.sel = null; estado.detalle = null; pintarLista();
+  $("detalle").innerHTML = `
+    <h2>Nueva cotización</h2>
+    <form id="form-cot" class="box" style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+      <label>Cliente<br><input name="cliente_id" required value="cli-4"></label>
+      <label>Ubicación<br><input name="ubicacion" required value="Monterrey, N.L."></label>
+      <label>Tipo de inmueble<br><input name="tipo_de_inmueble" required value="Casa"></label>
+      <label>Superficie (m²)<br><input name="superficie" type="number" min="1" step="any" required value="100"></label>
+      <label>Frecuencia<br><select name="frecuencia"><option>Única</option><option>Semanal</option><option>Quincenal</option><option>Diaria</option></select></label>
+      <label>Extras (separados por coma)<br><input name="extras" placeholder="Limpieza de ventanas"></label>
+      <label>Duración estimada (h)<br><input name="duracion_horas" type="number" min="0.5" step="0.5" required value="3"></label>
+      <label>Personal<br><input name="personal" type="number" min="1" required value="2"></label>
+      <label>Precio estimado ($)<br><input name="precio" type="number" min="0" step="any" required value="1200"></label>
+      <div style="grid-column:1/-1"><button class="primary" type="submit">Emitir cotización</button></div>
+    </form>`;
+  $("form-cot").onsubmit = async (ev) => {
+    ev.preventDefault();
+    const f = Object.fromEntries(new FormData(ev.target));
+    const r = await ejecutarCot({
+      cliente_id: f.cliente_id, ubicacion: f.ubicacion, superficie: f.superficie,
+      tipo_de_inmueble: f.tipo_de_inmueble, frecuencia: f.frecuencia,
+      extras: f.extras.split(",").map((x) => x.trim()).filter(Boolean),
+      duracion_horas: f.duracion_horas, personal: Number(f.personal), precio: f.precio});
+    if (r) { estado.pestana = "cotizaciones"; await abrir("cotizacion", r.cotizacion.folio, true); }
+  };
+}
+async function ejecutarCot(cuerpo) {
+  try {
+    const r = await api("/cotizaciones", "POST", cuerpo);
+    aviso("ok", `<b>Cotización ${esc(r.cotizacion.folio)} emitida</b>`);
+    estado.panel = await api("/panel"); pintarResumen();
+    return r;
+  } catch (e) { avisoError(e); return null; }
+}
+
+/* ---------- arranque ---------- */
+function cambiarPestana(p) {
+  estado.pestana = p;
+  $("tab-servicios").classList.toggle("on", p === "servicios");
+  $("tab-cotizaciones").classList.toggle("on", p === "cotizaciones");
+  pintarNueva(); pintarLista();
+}
+$("rol").innerHTML = Object.keys(ROLES).map((r) => `<option ${r === estado.rol ? "selected" : ""}>${r}</option>`).join("");
+$("rol").onchange = (e) => {
+  estado.rol = e.target.value;
+  $("quien").textContent = estado.rol === "Cliente" ? "actúa como el cliente de la cotización" : `usuario: ${ROLES[estado.rol]}`;
+  pintarNueva(); if (estado.detalle) pintarDetalle();
+};
+$("tab-servicios").onclick = () => cambiarPestana("servicios");
+$("tab-cotizaciones").onclick = () => cambiarPestana("cotizaciones");
+$("recargar").onclick = () => cargarPanel().then(() => aviso("ok", "<b>Datos actualizados</b>")).catch(avisoError);
+$("quien").textContent = `usuario: ${ROLES[estado.rol]}`;
+cargarPanel().then(() => cambiarPestana("cotizaciones")).catch(avisoError);
+</script>
+</body>
+</html>

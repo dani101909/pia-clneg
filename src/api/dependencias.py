@@ -6,6 +6,7 @@ from fastapi import Request
 from ..application.resultado import Resultado
 from ..infrastructure.composicion import Aplicacion
 from ..infrastructure.composicion_sql import construirAplicacionSql
+from ..infrastructure.sql_lectura import PanelReadRepositorySql
 from ..infrastructure.sql_repositorios import (CotizacionRepositorySql,
                                                ServicioRepositorySql)
 
@@ -24,13 +25,15 @@ class Contexto:
     app: Aplicacion
     cotizaciones: CotizacionRepositorySql    # solo lectura para las vistas
     servicios: ServicioRepositorySql
+    panel: PanelReadRepositorySql            # lectura del panel operativo
 
 
 def contexto(request: Request):
     conexion = request.app.state.bd.abrir()
     try:
         yield Contexto(construirAplicacionSql(conexion),
-                       CotizacionRepositorySql(conexion), ServicioRepositorySql(conexion))
+                       CotizacionRepositorySql(conexion), ServicioRepositorySql(conexion),
+                       PanelReadRepositorySql(conexion))
     finally:
         conexion.cerrar()
 

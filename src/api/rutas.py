@@ -163,6 +163,12 @@ def consultar_disponibilidad(fecha: date = Query(description="AAAA-MM-DD"),
     return [{"cuadrilla_id": f.cuadrilla_id, "libre": f.libre} for f in filas]
 
 
+@router.get("/panel", tags=["Consultas"],
+            summary="Panel operativo: cotizaciones, servicios por estado, cuadrillas y personal (US-18)")
+def panel_operativo(ctx: Contexto = Depends(contexto)):
+    return ctx.panel.resumen()
+
+
 @router.get("/salud", tags=["Sistema"], summary="Verificacion de que la API responde")
 def salud():
     return {"estado": "ok"}

@@ -4,9 +4,10 @@ Ejecutar:  python -m uvicorn src.api.main:app --reload
 BD:        variable DATABASE_URL (SQLite por defecto; PostgreSQL con una URL postgresql://)
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from ..domain.errores import ErrorDeDominio
 from ..infrastructure.base_de_datos import BaseDeDatos
@@ -65,6 +66,11 @@ def crear_app(url_bd=None, cargar_demo=False) -> FastAPI:
         return _respuesta(error.codigo, error.detalle)
 
     app.include_router(router)
+
+    @app.get("/", include_in_schema=False)
+    def interfaz():
+        return FileResponse(Path(__file__).parent / "static" / "index.html")
+
     return app
 
 
