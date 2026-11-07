@@ -5,14 +5,19 @@ class PanelReadRepositorySql:
     def __init__(self, conexion):
         self._c = conexion
 
-    def resumen(self) -> dict:
+    def resumen(self, cliente_id=None) -> dict:
+        """Panel completo; con `cliente_id` solo sus cotizaciones y servicios."""
         c = self._c
+        filtro = "WHERE cliente_id = ?" if cliente_id else ""
+        filtro_q = "WHERE q.cliente_id = ?" if cliente_id else ""
+        params = (cliente_id,) if cliente_id else ()
         cotizaciones = [
             {"folio": f, "cliente_id": cli, "ubicacion": ub, "tipo_de_inmueble": tipo,
              "frecuencia": frec, "precio": precio, "estado": estado}
             for f, cli, ub, tipo, frec, precio, estado in c.ejecutar(
                 """SELECT folio, cliente_id, ubicacion, tipo_de_inmueble, frecuencia,
-                          precio, estado FROM cotizaciones ORDER BY folio""").fetchall()]
+                          precio, estado FROM cotizaciones """ + filtro
+                + " ORDER BY folio", params).fetchall()]
         servicios = [
             {"folio": f, "estado": estado, "fecha": fecha, "cuadrilla_id": cuadrilla,
              "cliente_id": cli, "ubicacion": ub, "pendientes": pend}
@@ -25,8 +30,11 @@ class PanelReadRepositorySql:
                         + (SELECT COUNT(*) FROM extras_servicio e
                             WHERE e.servicio_folio = s.folio
                               AND e.estado = 'Pendiente de confirmacion')
-                   FROM servicios s JOIN cotizaciones q ON q.folio = s.folio
-                   ORDER BY s.folio""").fetchall()]
+                   FROM servicios s JOIN cotizaciones q ON q.folio = s.folio """
+                + filtro_q + " ORDER BY s.folio", params).fetchall()]
+        if cliente_id:                       # el cliente no ve cuadrillas ni personal
+            return {"cotizaciones": cotizaciones, "servicios": servicios,
+                    "cuadrillas": [], "empleados": []}
         integrantes = {}
         for cuadrilla, empleado in c.ejecutar(
                 """SELECT cuadrilla_id, empleado_id FROM cuadrilla_integrantes

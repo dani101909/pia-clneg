@@ -9,6 +9,7 @@ from ..infrastructure.composicion_sql import construirAplicacionSql
 from ..infrastructure.sql_lectura import PanelReadRepositorySql
 from ..infrastructure.sql_repositorios import (CotizacionRepositorySql,
                                                ServicioRepositorySql)
+from ..infrastructure.sql_usuarios import UsuarioRepositorySql
 
 
 class ErrorDeNegocio(Exception):
@@ -26,6 +27,7 @@ class Contexto:
     cotizaciones: CotizacionRepositorySql    # solo lectura para las vistas
     servicios: ServicioRepositorySql
     panel: PanelReadRepositorySql            # lectura del panel operativo
+    usuarios: UsuarioRepositorySql           # autenticacion
 
 
 def contexto(request: Request):
@@ -33,7 +35,7 @@ def contexto(request: Request):
     try:
         yield Contexto(construirAplicacionSql(conexion),
                        CotizacionRepositorySql(conexion), ServicioRepositorySql(conexion),
-                       PanelReadRepositorySql(conexion))
+                       PanelReadRepositorySql(conexion), UsuarioRepositorySql(conexion))
     finally:
         conexion.cerrar()
 

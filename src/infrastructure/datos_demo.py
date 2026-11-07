@@ -3,15 +3,48 @@
 Uso manual:  python -m src.infrastructure.datos_demo
 En la API:   CLEANPRO_DEMO=1 (se cargan al arrancar, solo si la BD esta vacia).
 """
+import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from ..domain.cotizacion import Cotizacion
 from ..domain.cuadrilla import Cuadrilla, Empleado
+from ..domain.usuario import Usuario
 from ..domain.valores import (Actor, DatosDelInmueble, Dinero, Estimacion, Folio,
                               Frecuencia, Motivo, Rol)
 from .sql_repositorios import (ConfiguracionRepositorySql, CotizacionRepositorySql,
                                CuadrillaRepositorySql, EmpleadoRepositorySql)
+from .seguridad import ITERACIONES_POR_DEFECTO, hashearClave
+from .sql_usuarios import UsuarioRepositorySql
+
+
+CLAVE_DEMO_POR_DEFECTO = "cleanpro123"
+USUARIOS_DEMO = (            # (usuario, nombre, rol, actor_id)
+    ("cliente1", "Cliente uno", Rol.CLIENTE, "cli-1"),
+    ("cliente2", "Cliente dos", Rol.CLIENTE, "cli-2"),
+    ("cliente3", "Cliente tres", Rol.CLIENTE, "cli-3"),
+    ("coord1", "Coordinador demo", Rol.COORDINADOR, "coord-1"),
+    ("sup1", "Supervisor demo", Rol.SUPERVISOR, "sup-1"),
+    ("admin1", "Administracion demo", Rol.ADMINISTRACION, "admin-1"),
+)
+
+
+def cargarUsuarios(conexion, clave=None, iteraciones=ITERACIONES_POR_DEFECTO):
+    """Crea los usuarios de demostracion si la tabla esta vacia.
+
+    Es independiente de `cargar`: una base que ya tenia datos de demo (de antes del
+    login) tambien recibe sus usuarios. La clave sale de CLEANPRO_CLAVE_DEMO; cambiala
+    en cualquier despliegue publico. Se calcula un solo hash y se reutiliza.
+    """
+    usuarios = UsuarioRepositorySql(conexion)
+    if usuarios.contar():
+        return False
+    clave = clave or os.environ.get("CLEANPRO_CLAVE_DEMO") or CLAVE_DEMO_POR_DEFECTO
+    huella = hashearClave(clave, iteraciones=iteraciones)
+    for nombre_de_usuario, nombre, rol, actor_id in USUARIOS_DEMO:
+        usuarios.guardar(Usuario(nombre_de_usuario, nombre, rol, actor_id, huella))
+    conexion.commit()
+    return True
 
 
 def cargar(conexion):
@@ -49,4 +82,5 @@ if __name__ == "__main__":
     c = BaseDeDatos().abrir()
     c.crearEsquema()
     print("Datos cargados" if cargar(c) else "La base ya tenia datos")
+    print("Usuarios creados" if cargarUsuarios(c) else "La base ya tenia usuarios")
     c.cerrar()

@@ -10,6 +10,7 @@ import unittest
 
 from src.infrastructure.base_de_datos import BaseDeDatos
 from tests import test_casos_de_uso_ampliados as base
+from tests.test_usuarios import UsuariosContrato
 
 URL = os.environ.get("TEST_DATABASE_URL")
 requiere_postgres = unittest.skipUnless(URL, "define TEST_DATABASE_URL para probar PostgreSQL")
@@ -54,6 +55,11 @@ class FlujoCompletoPostgres(_SobrePostgres, base.AppSqlConDemo):
         self.assertEqual(r.codigo, "SIN_PERMISO")
         self.assertEqual(self.conexion.ejecutar(
             "SELECT COUNT(*) FROM servicios").fetchone()[0], 0)
+
+
+@requiere_postgres
+class UsuariosPostgres(_SobrePostgres, UsuariosContrato, unittest.TestCase):
+    pass
 
 
 if __name__ == "__main__":

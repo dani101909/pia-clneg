@@ -25,58 +25,57 @@ class EmitirCotizacionIn(BaseModel):
 
 
 class AceptarCotizacionIn(BaseModel):
-    cliente_id: str
     fecha: Optional[datetime] = Field(None, description="Fecha y hora del servicio")
 
 
 class ConfirmarCuadrillaIn(BaseModel):
     cuadrilla_id: str
-    coordinador_id: str
 
 
 class ReportarAusenciaIn(BaseModel):
     empleado_id: str
-    supervisor_id: str
 
 
 class ReasignarPersonalIn(BaseModel):
     empleado_id: str
     sustituto_id: Optional[str] = Field(None, description="null = no hay reemplazo (servicio en riesgo)")
-    admin_id: str
 
 
 class RegistrarExtraIn(BaseModel):
     descripcion: str
-    supervisor_id: str
-
-
-class ConfirmarExtraIn(BaseModel):
-    coordinador_id: str
 
 
 class RegistrarInicioIn(BaseModel):
-    supervisor_id: str
     momento: Optional[datetime] = None
 
 
 class RegistrarTerminoIn(BaseModel):
-    supervisor_id: str
     momento: Optional[datetime] = None
 
 
 class DocumentarIncidenciaIn(BaseModel):
     tipo: TipoDeIncidencia
     descripcion: str
-    supervisor_id: str
     empleado_id: Optional[str] = None
 
 
-class RevisarIncidenciaIn(BaseModel):
-    admin_id: str
+class LoginIn(BaseModel):
+    usuario: str = Field(min_length=1, max_length=64)
+    clave: str = Field(min_length=1, max_length=128)
 
 
-class CerrarParaFacturacionIn(BaseModel):
-    admin_id: str
+class UsuarioOut(BaseModel):
+    usuario: str
+    nombre: str
+    rol: str
+    actor_id: str
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expira_en: int = Field(description="Segundos de vigencia que le quedan al token")
+    usuario: UsuarioOut
 
 
 class ErrorOut(BaseModel):

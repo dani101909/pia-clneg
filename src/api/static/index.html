@@ -16,6 +16,7 @@
             --err-bg:#3d1c1c; --err:#f3a0a0; --ok-bg:#12352c; --ok:#7fddc3; }
   }
   * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
   body { margin:0; background:var(--bg); color:var(--ink);
          font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
   header { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center;
@@ -69,18 +70,34 @@
   #aviso.err { background:var(--err-bg); color:var(--err); }
   #aviso ul { margin:6px 0 0 18px; padding:0; }
   .vacio { color:var(--muted); padding:30px 10px; text-align:center; }
+  #login { min-height:100vh; display:grid; place-items:center; padding:20px; }
+  #form-login { width:min(380px,100%); display:grid; gap:12px; padding:22px; }
+  #form-login h1 { margin:0; font-size:22px; }
+  #form-login h1 span { color:var(--brand); }
+  #form-login input { width:100%; }
+  #l-error { min-height:1.2em; color:var(--err); font-size:13px; }
 </style>
 </head>
 <body>
+<section id="login" hidden>
+  <form id="form-login" class="panel">
+    <h1>Clean<span>Pro</span></h1>
+    <div class="muted">Inicia sesión para continuar.</div>
+    <label>Usuario<br><input id="l-usuario" autocomplete="username" autocapitalize="none" required></label>
+    <label>Contraseña<br><input id="l-clave" type="password" autocomplete="current-password" required></label>
+    <div id="l-error" role="alert"></div>
+    <button class="primary" type="submit" id="l-entrar">Entrar</button>
+  </form>
+</section>
+
+<div id="app" hidden>
 <header>
   <h1>Clean<span>Pro</span> · Operación</h1>
-  <label class="inline">Rol activo
-    <select id="rol"></select>
-  </label>
   <span class="muted" id="quien"></span>
   <span class="grow"></span>
   <button id="recargar" title="Volver a consultar">Actualizar</button>
   <a class="doc" href="/docs" target="_blank" rel="noopener">API (Swagger)</a>
+  <button id="salir">Cerrar sesión</button>
 </header>
 
 <div class="strip" id="resumen" aria-label="Servicios por estado"></div>
@@ -96,17 +113,18 @@
   </section>
   <section class="panel" id="detalle"><div class="vacio">Elige un servicio o una cotización de la lista.</div></section>
 </main>
+</div>
 <div id="aviso" role="status" aria-live="polite"></div>
 
 <script>
 "use strict";
-const ROLES = {
-  "Cliente": null,                     // actua con el id del cliente de la cotizacion
-  "Coordinador": "coord-1",
-  "Supervisor": "sup-1",
-  "Administración": "admin-1"
-};
+// El rol sale del servidor (/auth/login y /auth/yo); aqui solo se traduce a texto de pantalla.
+const ROL_UI = {Cliente: "Cliente", Coordinador: "Coordinador", Supervisor: "Supervisor",
+                Administracion: "Administración"};
 const MENSAJES = {
+  NO_AUTENTICADO: "Tu sesión terminó. Inicia sesión de nuevo.",
+  CREDENCIALES_INVALIDAS: "Usuario o contraseña incorrectos.",
+  DEMASIADOS_INTENTOS: "Demasiados intentos fallidos. Espera un momento e inténtalo de nuevo.",
   SIN_PERMISO: "Tu rol no puede realizar esta acción.",
   COTIZACION_NO_VIGENTE: "La cotización ya no está vigente.",
   TRANSICION_INVALIDA: "Esa acción no es posible en el estado actual del servicio.",
@@ -127,19 +145,44 @@ const esc = (t) => String(t ?? "").replace(/[&<>"']/g,
 const fmt = (iso) => iso ? new Date(iso).toLocaleString("es-MX",
   {dateStyle:"medium", timeStyle:"short"}) : "—";
 
-let estado = { rol: "Coordinador", panel: null, pestana: "servicios", sel: null, detalle: null, disp: null };
+let estado = { rol: null, usuario: null, panel: null, pestana: "servicios", sel: null, detalle: null, disp: null };
+
+/* ---------- sesion (token) ---------- */
+// sessionStorage puede fallar (ventanas privadas, politicas del navegador): se cae a memoria.
+let tokenEnMemoria = null;
+function leerToken() {
+  try { return sessionStorage.getItem("cleanpro_token") || tokenEnMemoria; }
+  catch (_) { return tokenEnMemoria; }
+}
+function guardarToken(t) {
+  tokenEnMemoria = t;
+  try { sessionStorage.setItem("cleanpro_token", t); } catch (_) {}
+}
+function borrarToken() {
+  tokenEnMemoria = null;
+  try { sessionStorage.removeItem("cleanpro_token"); } catch (_) {}
+}
 
 /* ---------- API ---------- */
-async function api(ruta, metodo = "GET", cuerpo) {
+async function api(ruta, metodo = "GET", cuerpo, opciones = {}) {
+  const cabeceras = {};
+  if (cuerpo) cabeceras["Content-Type"] = "application/json";
+  const token = leerToken();
+  if (token && !opciones.sinToken) cabeceras["Authorization"] = "Bearer " + token;
   const r = await fetch(ruta, {
     method: metodo,
-    headers: cuerpo ? {"Content-Type": "application/json"} : undefined,
+    headers: cabeceras,
     body: cuerpo ? JSON.stringify(cuerpo) : undefined
   });
   let datos = null;
   try { datos = await r.json(); } catch (_) {}
   if (!r.ok) {
     const e = (datos && datos.codigo) ? datos : {codigo: "VALIDACION", detalle: ""};
+    // Token vencido, falso o de un usuario desactivado: volver al login.
+    if (r.status === 401 && !opciones.sinToken) {
+      cerrarSesion(MENSAJES.NO_AUTENTICADO);
+      throw Object.assign(new Error(e.codigo), {codigo: e.codigo, http: 401, silencioso: true});
+    }
     throw Object.assign(new Error(e.codigo), {codigo: e.codigo, detalle: e.detalle, http: r.status});
   }
   return datos;
@@ -153,6 +196,7 @@ function aviso(tipo, html) {
   temporizador = setTimeout(() => { a.style.display = "none"; }, tipo === "ok" ? 4500 : 9000);
 }
 function avisoError(e) {
+  if (e && e.silencioso) return;
   const base = MENSAJES[e.codigo] || "No se pudo completar la acción.";
   const det = Array.isArray(e.detalle) && e.detalle.length
     ? "<ul>" + e.detalle.map((d) => `<li>${esc(d)}</li>`).join("") + "</ul>"
@@ -167,13 +211,57 @@ async function ejecutar(ruta, cuerpo, mensaje) {
     aviso("ok", `<b>${esc(mensaje)}</b>${ev}`);
     await cargarPanel();
     return r;
-  } catch (e) { avisoError(e); await cargarPanel(); return null; }
+  } catch (e) {
+    avisoError(e);
+    try { await cargarPanel(); } catch (_) {}
+    return null;
+  }
 }
 
-/* ---------- actor segun el rol ---------- */
-function actor() {
-  if (estado.rol === "Cliente") return (estado.detalle && estado.detalle.cliente_id) || (estado.sel && estado.sel.cliente_id) || "cli-1";
-  return ROLES[estado.rol];
+/* ---------- login / sesion ---------- */
+function mostrarLogin(mensaje) {
+  $("app").hidden = true; $("login").hidden = false;
+  $("l-error").textContent = mensaje || "";
+  $("l-clave").value = "";
+  $("l-usuario").focus();
+}
+function mostrarApp() {
+  $("login").hidden = true; $("app").hidden = false;
+  $("quien").textContent = `${estado.usuario.nombre} · ${estado.rol}`;
+}
+function cerrarSesion(mensaje) {
+  borrarToken();
+  estado = { rol: null, usuario: null, panel: null, pestana: "servicios", sel: null, detalle: null, disp: null };
+  $("detalle").innerHTML = `<div class="vacio">Elige un servicio o una cotización de la lista.</div>`;
+  $("lista").innerHTML = ""; $("resumen").innerHTML = ""; $("nueva").innerHTML = "";
+  mostrarLogin(mensaje);
+}
+function fijarUsuario(u) {
+  estado.usuario = u;
+  estado.rol = ROL_UI[u.rol] || u.rol;
+}
+async function entrarAlPanel() {
+  mostrarApp();
+  await cargarPanel();
+  cambiarPestana("cotizaciones");
+}
+async function iniciarSesion(ev) {
+  ev.preventDefault();
+  const boton = $("l-entrar");
+  boton.disabled = true; $("l-error").textContent = "";
+  try {
+    const r = await api("/auth/login", "POST",
+      {usuario: $("l-usuario").value.trim(), clave: $("l-clave").value}, {sinToken: true});
+    guardarToken(r.access_token);
+    fijarUsuario(r.usuario);
+    $("l-clave").value = "";
+    await entrarAlPanel();
+  } catch (e) {
+    if (e.silencioso) return;
+    let msg = MENSAJES[e.codigo] || "No se pudo iniciar sesión. Revisa los datos.";
+    if (e.codigo === "DEMASIADOS_INTENTOS" && typeof e.detalle === "string" && e.detalle) msg = e.detalle;
+    $("l-error").textContent = msg;
+  } finally { boton.disabled = false; }
 }
 
 /* ---------- carga ---------- */
@@ -220,7 +308,8 @@ function pintarLista() {
 
 function pintarNueva() {
   const cont = $("nueva");
-  if (estado.rol !== "Coordinador" || estado.pestana !== "cotizaciones") { cont.innerHTML = ""; return; }
+  const puedeEmitir = estado.rol === "Coordinador" || estado.rol === "Administración";
+  if (!puedeEmitir || estado.pestana !== "cotizaciones") { cont.innerHTML = ""; return; }
   cont.innerHTML = `<button class="primary" id="btn-nueva" style="width:100%;margin-bottom:10px">+ Nueva cotización</button>`;
   $("btn-nueva").onclick = formularioCotizacion;
 }
@@ -232,7 +321,7 @@ async function abrir(tipo, folio, desplazar) {
     detalle = tipo === "servicio" ? await api(`/servicios/${encodeURIComponent(folio)}`)
                                   : await api(`/cotizaciones/${encodeURIComponent(folio)}`);
     detalle.cliente_id = detalle.cliente_id || (meta && meta.cliente_id);
-    if (tipo === "servicio" && detalle.fecha) disp = await api(`/disponibilidad?fecha=${detalle.fecha.slice(0, 10)}`);
+    if (tipo === "servicio" && detalle.fecha && estado.rol !== "Cliente") disp = await api(`/disponibilidad?fecha=${detalle.fecha.slice(0, 10)}`);
   } catch (e) { avisoError(e); return; }
   // La seleccion y el detalle se asignan juntos: nunca quedan de tipos distintos.
   estado.sel = {tipo, folio, cliente_id: meta && meta.cliente_id};
@@ -265,7 +354,7 @@ function htmlCotizacion(c) {
       ${puede ? `<div class="row">
         <label class="inline">Fecha y hora del servicio <input type="datetime-local" id="f-fecha"></label>
         <button class="primary" id="a-aceptar">Aceptar y programar</button></div>`
-      : `<div class="muted">Solo el cliente (${esc(c.cliente_id)}) acepta su cotización. Cambia el rol a «Cliente».</div>`}
+      : `<div class="muted">Solo el cliente dueño de la cotización (${esc(c.cliente_id)}) puede aceptarla.</div>`}
     </div>` : `<div class="muted" style="margin-top:12px">Esta cotización ya no admite cambios.</div>`}`;
 }
 
@@ -318,7 +407,7 @@ function htmlServicio(s) {
     <div class="box"><h3>Facturación</h3><div class="row">
       <button class="primary" id="a-cierre">Cerrar para facturación</button></div></div>`;
   }
-  if (rol === "Cliente") acciones = `<div class="muted" style="margin-top:12px">El cliente consulta el estado e historial de su servicio. Para operar, cambia de rol.</div>`;
+  if (rol === "Cliente") acciones = `<div class="muted" style="margin-top:12px">Aquí consultas el estado e historial de tu servicio.</div>`;
 
   return `
     <h2>Servicio ${esc(s.folio)} <span class="badge ${esc(s.estado)}">${esc(s.estado)}</span></h2>
@@ -347,26 +436,26 @@ function enlazar() {
   clic("a-aceptar", () => {
     const f = $("f-fecha").value;
     ejecutar(`/cotizaciones/${encodeURIComponent(folio)}/aceptacion`,
-      {cliente_id: actor(), fecha: f ? f + ":00" : null}, "Cotización aceptada; servicio programado");
+      {fecha: f ? f + ":00" : null}, "Cotización aceptada; servicio programado");
   });
   clic("a-cuadrilla", () => ejecutar(`${base}/cuadrilla`,
-    {cuadrilla_id: $("f-cuadrilla").value, coordinador_id: actor()}, "Cuadrilla confirmada"));
-  clic("a-inicio", () => ejecutar(`${base}/inicio`, {supervisor_id: actor()}, "Inicio registrado"));
-  clic("a-termino", () => ejecutar(`${base}/termino`, {supervisor_id: actor()}, "Término registrado"));
+    {cuadrilla_id: $("f-cuadrilla").value}, "Cuadrilla confirmada"));
+  clic("a-inicio", () => ejecutar(`${base}/inicio`, {}, "Inicio registrado"));
+  clic("a-termino", () => ejecutar(`${base}/termino`, {}, "Término registrado"));
   clic("a-ausencia", () => ejecutar(`${base}/ausencias`,
-    {empleado_id: $("f-ausente").value, supervisor_id: actor()}, "Ausencia reportada; se avisó a Administración"));
+    {empleado_id: $("f-ausente").value}, "Ausencia reportada; se avisó a Administración"));
   clic("a-extra", () => ejecutar(`${base}/extras`,
-    {descripcion: $("f-extra").value, supervisor_id: actor()}, "Extra registrado"));
+    {descripcion: $("f-extra").value}, "Extra registrado"));
   clic("a-incidencia", () => ejecutar(`${base}/incidencias`,
-    {tipo: $("f-tipo").value, descripcion: $("f-inc").value, supervisor_id: actor()}, "Incidencia documentada"));
+    {tipo: $("f-tipo").value, descripcion: $("f-inc").value}, "Incidencia documentada"));
   clic("a-reasignar", () => ejecutar(`${base}/reasignaciones`,
-    {empleado_id: $("f-orig").value, sustituto_id: $("f-sust").value || null, admin_id: actor()},
+    {empleado_id: $("f-orig").value, sustituto_id: $("f-sust").value || null},
     $("f-sust").value ? "Personal reasignado" : "Servicio declarado en riesgo"));
-  clic("a-cierre", () => ejecutar(`${base}/cierre`, {admin_id: actor()}, "Servicio cerrado para facturación"));
+  clic("a-cierre", () => ejecutar(`${base}/cierre`, undefined, "Servicio cerrado para facturación"));
   document.querySelectorAll("[data-revisar]").forEach((b) => b.onclick = () =>
-    ejecutar(`${base}/incidencias/${encodeURIComponent(b.dataset.revisar)}/revision`, {admin_id: actor()}, "Incidencia revisada"));
+    ejecutar(`${base}/incidencias/${encodeURIComponent(b.dataset.revisar)}/revision`, undefined, "Incidencia revisada"));
   document.querySelectorAll("[data-confirmar-extra]").forEach((b) => b.onclick = () =>
-    ejecutar(`${base}/extras/${encodeURIComponent(b.dataset.confirmarExtra)}/confirmacion`, {coordinador_id: actor()}, "Extra confirmado"));
+    ejecutar(`${base}/extras/${encodeURIComponent(b.dataset.confirmarExtra)}/confirmacion`, undefined, "Extra confirmado"));
 }
 
 function formularioCotizacion() {
@@ -412,17 +501,20 @@ function cambiarPestana(p) {
   $("tab-cotizaciones").classList.toggle("on", p === "cotizaciones");
   pintarNueva(); pintarLista();
 }
-$("rol").innerHTML = Object.keys(ROLES).map((r) => `<option ${r === estado.rol ? "selected" : ""}>${r}</option>`).join("");
-$("rol").onchange = (e) => {
-  estado.rol = e.target.value;
-  $("quien").textContent = estado.rol === "Cliente" ? "actúa como el cliente de la cotización" : `usuario: ${ROLES[estado.rol]}`;
-  pintarNueva(); if (estado.detalle) pintarDetalle();
-};
 $("tab-servicios").onclick = () => cambiarPestana("servicios");
 $("tab-cotizaciones").onclick = () => cambiarPestana("cotizaciones");
 $("recargar").onclick = () => cargarPanel().then(() => aviso("ok", "<b>Datos actualizados</b>")).catch(avisoError);
-$("quien").textContent = `usuario: ${ROLES[estado.rol]}`;
-cargarPanel().then(() => cambiarPestana("cotizaciones")).catch(avisoError);
+$("form-login").onsubmit = iniciarSesion;
+$("salir").onclick = () => cerrarSesion("");
+
+// Si ya hay un token guardado en esta pestaña, se valida con el servidor; si no sirve, login.
+(async () => {
+  if (!leerToken()) { mostrarLogin(""); return; }
+  try {
+    fijarUsuario(await api("/auth/yo"));
+    await entrarAlPanel();
+  } catch (e) { if (!e.silencioso) mostrarLogin(""); }
+})();
 </script>
 </body>
 </html>

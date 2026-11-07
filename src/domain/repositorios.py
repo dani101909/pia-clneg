@@ -35,3 +35,15 @@ class EmpleadoRepository(ABC):
 class ConfiguracionRepository(ABC):
     @abstractmethod
     def obtenerPoliticasVigentes(self): ...
+
+
+class UsuarioRepository(ABC):
+    @abstractmethod
+    def guardar(self, usuario): ...
+
+    @abstractmethod
+    def obtenerPorNombreDeUsuario(self, nombre_de_usuario):
+        """Devuelve el Usuario o lanza NoEncontrado."""
+
+    @abstractmethod
+    def contar(self): ...

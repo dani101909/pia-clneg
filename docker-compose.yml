@@ -24,6 +24,10 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-cleanpro}:${POSTGRES_PASSWORD:-cleanpro}@db:5432/${POSTGRES_DB:-cleanpro}
       CLEANPRO_DEMO: ${CLEANPRO_DEMO:-1}
+      # Sin CLEANPRO_SECRET la app arranca con un secreto aleatorio (las sesiones se
+      # pierden al reiniciar). Defínela en .env o en el entorno para que sea estable.
+      CLEANPRO_SECRET: ${CLEANPRO_SECRET:-}
+      CLEANPRO_CLAVE_DEMO: ${CLEANPRO_CLAVE_DEMO:-cleanpro123}
     ports:
       - "${PORT:-8000}:8000"
 

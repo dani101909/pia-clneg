@@ -76,6 +76,13 @@ ESQUEMA = (
         id TEXT PRIMARY KEY,
         nombre TEXT NOT NULL,
         disponible_para_cubrir INTEGER NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS usuarios (
+        nombre_de_usuario TEXT PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        rol TEXT NOT NULL,
+        actor_id TEXT NOT NULL,
+        clave_hash TEXT NOT NULL,
+        activo INTEGER NOT NULL)""",
     "CREATE TABLE IF NOT EXISTS cuadrillas (id TEXT PRIMARY KEY)",
     """CREATE TABLE IF NOT EXISTS cuadrilla_integrantes (
         cuadrilla_id TEXT NOT NULL REFERENCES cuadrillas (id),
